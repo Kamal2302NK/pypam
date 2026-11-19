@@ -1,0 +1,40 @@
+[Unit]
+Description=PyPAM - Privileged Access Management
+Documentation=https://github.com/yourorg/pypam
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pypam
+Group=pypam
+WorkingDirectory=/opt/pypam
+Environment=PATH=/opt/pypam/venv/bin:/usr/bin
+EnvironmentFile=/opt/pypam/.env
+
+ExecStart=/opt/pypam/venv/bin/gunicorn \
+    --worker-class eventlet \
+    -w 1 \
+    --bind 127.0.0.1:5000 \
+    --timeout 120 \
+    --access-logfile /var/log/pypam/access.log \
+    --error-logfile /var/log/pypam/error.log \
+    "app:create_app()"
+
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+
+# Restart policy
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/pypam/data /opt/pypam /var/log/pypam /data/jump-2 /data
+
+[Install]
+WantedBy=multi-user.target

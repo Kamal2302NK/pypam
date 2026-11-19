@@ -1,0 +1,57 @@
+# =============================================================================
+# PyPAM — Docker Compose (full stack)
+# =============================================================================
+# Usage:
+#   cp .env.example .env          # edit secrets
+#   docker-compose up -d          # start
+#   docker-compose logs -f pypam  # follow logs
+#   docker-compose down           # stop
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ---------- PyPAM Application ----------
+  pypam:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pypam-app
+    ports:
+      - "5000:5000"
+    volumes:
+      - pypam_data:/app/data
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-changeme}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-changeme}
+      - DATABASE_URI=sqlite:////app/data/pypam.db
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-changeme}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SESSION_RECORDING_PATH=/app/data/sessions
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - DEBUG=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------- Nginx Reverse Proxy ----------
+  nginx:
+    image: nginx:alpine
+    container_name: pypam-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      pypam:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pypam_data:
+    driver: local
